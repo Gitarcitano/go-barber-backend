@@ -1,26 +1,25 @@
-import nodemailer, { Transporter } from 'nodemailer';
-import aws from 'aws-sdk';
+// import nodemailer, { Transporter } from 'nodemailer';
+// import aws from 'aws-sdk';
+import sgMail from '@sendgrid/mail';
 import mailConfig from '@config/mail';
 
 import { injectable, inject } from 'tsyringe';
+import AppError from '@shared/errors/AppError';
 import IMailProvider from '../models/IMailProvider';
 import ISendMailDTO from '../dtos/ISendMailDTO';
 import IMailTemplateProvider from '../../MailTemplateProvider/models/IMailTemplateProvider';
 
 @injectable()
-export default class SESMailProvider implements IMailProvider {
-  private client: Transporter;
-
+export default class SendGridMailProvider implements IMailProvider {
   constructor(
     @inject('MailTemplateProvider')
     private mailTemplateProvider: IMailTemplateProvider,
   ) {
-    this.client = nodemailer.createTransport({
-      SES: new aws.SES({
-        apiVersion: '2020-12-01',
-        region: 'Brasilsão',
-      }),
-    });
+    if (!process.env.SENDGRID_API_KEY) {
+      throw new AppError('You need to set a SendGrid API KEY.');
+    }
+
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
   }
 
   public async sendMail({
@@ -29,19 +28,15 @@ export default class SESMailProvider implements IMailProvider {
     subject,
     templateData,
   }: ISendMailDTO): Promise<void> {
-    const { name, email } = mailConfig.defaults.from;
+    const { email } = mailConfig.defaults.from;
 
-    await this.client.sendMail({
-      from: {
-        name: from?.name || name,
-        address: from?.email || email,
-      },
-      to: {
-        name: to.name,
-        address: to.email,
-      },
+    const msg = {
+      from: from?.email || email,
+      to: to.email,
       subject,
       html: await this.mailTemplateProvider.parse(templateData),
-    });
+    };
+
+    sgMail.send(msg);
   }
 }
