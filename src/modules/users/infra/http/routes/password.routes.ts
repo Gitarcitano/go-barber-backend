@@ -18,7 +18,7 @@ passwordRouter.post(
   forgotPasswordController.create,
 );
 passwordRouter.post(
-  '/rest',
+  '/reset',
   celebrate({
     [Segments.BODY]: {
       token: Joi.string().uuid().required(),
